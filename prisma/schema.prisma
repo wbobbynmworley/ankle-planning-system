@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  PATIENT
+}
+
+enum FileType {
+  STL
+  FRONT
+  SIDE
+  REPORT
+  OTHER
+}
+
+enum CaseStatus {
+  DRAFT
+  PENDING_PLAN
+  PLANNED
+  PREOP_DONE
+  POSTOP_DONE
+  COMPLETED
+}
+
+enum MeasurementStage {
+  PREOP_2D
+  PREOP_3D
+  POSTOP_2D
+  POSTOP_3D
+}
+
+enum PlanAlgoType {
+  PLAN_2D
+  PLAN_3D
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  role          Role
+  doctorCode    String?   @unique
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  casesAsDoctor Case[]    @relation("DoctorCases")
+  patient       Patient?
+  logs          Log[]
+
+  @@index([role])
+}
+
+model Patient {
+  id         String   @id @default(cuid())
+  idNumber   String   @unique
+  name       String?
+  phone      String?
+  userId     String?  @unique
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cases      Case[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([idNumber])
+  @@index([userId])
+}
+
+model Case {
+  id          String     @id @default(cuid())
+  patientId   String
+  doctorId    String
+  status      CaseStatus @default(DRAFT)
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  patient     Patient    @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor      User       @relation("DoctorCases", fields: [doctorId], references: [id], onDelete: Restrict)
+  files       File[]
+  plans       Plan[]
+  measurements Measurement[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+}
+
+model File {
+  id           String   @id @default(cuid())
+  caseId       String
+  type         FileType
+  path         String
+  originalName String?
+  mimeType     String?
+  size         Int?
+  createdAt    DateTime @default(now())
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model Plan {
+  id                  String       @id @default(cuid())
+  caseId              String
+  algoType            PlanAlgoType
+  totalDistance       Float?
+  totalDays           Int?
+  dailySteps          Json?
+  rawPath             Json?
+  meta                Json?        // 方案与最终掩码：maskPathsUsed, finalPoseMm 等
+  instrumentConfig    Json?        // 参考环、动环、6杆型号、组合方式
+  initialScales       Json?        // 6条杆初始刻度与杆长 [{scale, lengthMm}, ...]
+  measurementSnapshot Json?        // 术前/术后测量数据快照
+  createdAt           DateTime     @default(now())
+  case                Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model Measurement {
+  id        String           @id @default(cuid())
+  caseId    String
+  stage     MeasurementStage
+  viewKey   String?          // 正位/侧位等
+  values    Json             // 测量项 key-value，如 anklePlantarflexion, footEversion 等
+  createdAt DateTime         @default(now())
+  case      Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([caseId, stage])
+}
+
+model InstrumentRing {
+  id         String   @id @default(cuid())
+  name       String
+  code       String   @unique // 如 "180环形圈"
+  diameterMm Float?
+  spec       Json?    // 扩展参数
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model InstrumentRod {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique // 如 "155双套连杆"
+  lengthMm  Float?
+  spec      Json?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InstrumentCombination {
+  id           String   @id @default(cuid())
+  name         String
+  code         String   @unique // 双环型、6+6、6*6(1)、6*6(2)
+  ringRefIds   Json     // ["ringId1","ringId2"] 或单环
+  rodRefIds    Json     // ["rodId1",...]
+  configSchema Json?    // 几何/铰点等
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model RolePermission {
+  id      String  @id @default(cuid())
+  role    String  // ADMIN, DOCTOR, PATIENT
+  resource String
+  action  String
+  allowed Boolean @default(true)
+
+  @@unique([role, resource, action])
+  @@index([role])
+}
+
+model DataPermission {
+  id       String  @id @default(cuid())
+  role     String
+  scope    String  // ALL, OWN, DEPT
+  resource String?
+
+  @@index([role])
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  ip        String?
+  meta      Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+}

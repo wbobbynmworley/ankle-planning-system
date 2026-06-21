@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"H:\\\\足踝矫正副本\\\\apps\\\\api\\\\prisma\\\\schema.prisma\"}",
+  "error": "File does not exist. Note: your current working directory is H:\\足踝矫正副本.",
+  "timestamp": "2026-05-04T01:39:52.956Z",
+  "retry_count": 1
+}

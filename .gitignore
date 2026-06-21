@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.eggs/
+
+# Storage (uploaded files)
+storage/
+apps/api/storage/
+
+# Prisma
+prisma/migrations/**/migration_lock.toml
+
+# Test / coverage
+coverage/
+.nyc_output/
+.pytest_cache/
+htmlcov/
+
+# SAM / heavy models (optional)
+*.pth
+sam_auto_masks/

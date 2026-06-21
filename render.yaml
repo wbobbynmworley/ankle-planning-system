@@ -1,0 +1,27 @@
+# Render Blueprint —— 免费部署 NestJS 主后端（apps/api）
+# 用法：在 https://render.com 新建 Blueprint，连接本仓库，Render 会读取此文件。
+# DATABASE_URL / ALGO_SERVICE_URL / CORS_ORIGIN 在 Render 控制台填写（sync:false 表示需手动填）。
+services:
+  - type: web
+    name: ankle-api
+    runtime: docker
+    plan: free
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    # 免费实例 15 分钟无访问会休眠，首次唤醒约 30~60s 属正常
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # 例：mysql://user:pass@gateway.tidbcloud.com:4000/ankle_app?sslaccept=accept_invalid_certs
+      - key: JWT_SECRET
+        generateValue: true   # Render 自动生成强随机值
+      - key: ALGO_SERVICE_URL
+        sync: false          # 你的 HF Space 地址，例：https://<用户名>-ankle-algo.hf.space
+      - key: CORS_ORIGIN
+        sync: false          # 你的 Vercel 前端地址，例：https://ankle-web.vercel.app
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PORT
+        value: "3001"

@@ -1,0 +1,76 @@
+version: "3.9"
+
+# 本地一键全栈（与 prisma schema 的 mysql provider 保持一致）。
+# 生产免费上线请参考 部署指南_免费上线.md（Web→Vercel / API→Render / Algo→HF Spaces / DB→TiDB）。
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: "1234"
+      MYSQL_DATABASE: ankle_app
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p1234 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  algo:
+    build:
+      context: ../apps/algo
+      dockerfile: Dockerfile
+    environment:
+      PYTHONUNBUFFERED: "1"
+      # 低配/免费部署用轻量模型并自动下载 checkpoint；本地若已放置 vit_h 文件可删掉这两行
+      SAM_MODEL_TYPE: vit_b
+      SAM_CHECKPOINT_URL: https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+    expose:
+      - "8000"
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: mysql://root:1234@mysql:3306/ankle_app
+      JWT_SECRET: change-me-in-production
+      ALGO_SERVICE_URL: http://algo:8000
+      ADMIN_EMAIL: admin@ankle.local
+      ADMIN_PASSWORD: ChangeMe123!
+      PORT: "3001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      algo:
+        condition: service_started
+    expose:
+      - "3001"
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://nginx
+    depends_on:
+      - api
+    expose:
+      - "3000"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+      - api
+
+volumes:
+  mysql_data:

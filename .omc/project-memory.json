@@ -1,0 +1,424 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1777797021286,
+  "projectRoot": "H:\\足踝矫正副本",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=18",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": "Node.js 18"
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {
+      "dev:api": "cd apps/api && npm run start:dev",
+      "dev:web": "cd apps/web && npm run dev",
+      "build:api": "cd apps/api && npm run build",
+      "build:web": "cd apps/web && npm run build",
+      "db:migrate": "cd apps/api && npx prisma migrate dev",
+      "db:generate": "cd apps/api && npx prisma generate",
+      "db:studio": "cd apps/api && npx prisma studio"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1777797021173,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 2,
+      "lastAccessed": 1777797021186,
+      "keyFiles": [
+        "WORKFLOW_2D_3D.md",
+        "前端完整设计_大括号结构图.md"
+      ]
+    },
+    "infra": {
+      "path": "infra",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1777797021189,
+      "keyFiles": [
+        "docker-compose.yml",
+        "nginx.conf",
+        "RAILWAY_DEPLOY.md"
+      ]
+    },
+    "prisma": {
+      "path": "prisma",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1777797021193,
+      "keyFiles": [
+        "schema.prisma",
+        "README_MIGRATE.md"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1777797021196,
+      "keyFiles": [
+        "dev.sh",
+        "create-db-mysql.sql"
+      ]
+    },
+    "apps\\api": {
+      "path": "apps\\api",
+      "purpose": "API routes",
+      "fileCount": 7,
+      "lastAccessed": 1777797021201,
+      "keyFiles": [
+        "package.json",
+        "tsconfig.json",
+        "nest-cli.json"
+      ]
+    },
+    "prisma\\migrations": {
+      "path": "prisma\\migrations",
+      "purpose": "Database migrations",
+      "fileCount": 1,
+      "lastAccessed": 1777797021209,
+      "keyFiles": [
+        "migration_lock.toml"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 15,
+      "lastAccessed": 1777858735400,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\cases\\[id]\\plan-2d\\page.tsx",
+      "accessCount": 11,
+      "lastAccessed": 1777799738279,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\cases\\[id]\\plan-3d\\page.tsx",
+      "accessCount": 11,
+      "lastAccessed": 1777799796709,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\lib\\api.ts",
+      "accessCount": 8,
+      "lastAccessed": 1777858777261,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\layout.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1777858804107,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\package.json",
+      "accessCount": 5,
+      "lastAccessed": 1777858777368,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\execution\\execution.controller.ts",
+      "accessCount": 5,
+      "lastAccessed": 1777858843004,
+      "type": "file"
+    },
+    {
+      "path": "prisma\\schema.prisma",
+      "accessCount": 5,
+      "lastAccessed": 1777858884501,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src",
+      "accessCount": 4,
+      "lastAccessed": 1777858804164,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\cases\\[id]\\page.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1777799607559,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\execution\\execution.service.ts",
+      "accessCount": 3,
+      "lastAccessed": 1777800409323,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src",
+      "accessCount": 3,
+      "lastAccessed": 1777858766291,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\api\\src\\plans\\plans.controller.ts",
+      "accessCount": 3,
+      "lastAccessed": 1777858793213,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\components\\Workbench2D\\ImageCanvas.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1777799521007,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\plans\\plans.service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777799533899,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\execution\\page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1777800422643,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\patient\\page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1777800586927,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\app.module.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858778807,
+      "type": "file"
+    },
+    {
+      "path": "apps\\algo\\algo\\planner_2d.py",
+      "accessCount": 2,
+      "lastAccessed": 1777858788979,
+      "type": "file"
+    },
+    {
+      "path": "apps\\algo\\algo\\planner_3d.py",
+      "accessCount": 2,
+      "lastAccessed": 1777858789020,
+      "type": "file"
+    },
+    {
+      "path": "apps\\algo\\algo\\main.py",
+      "accessCount": 2,
+      "lastAccessed": 1777858789185,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\cases\\cases.controller.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858793153,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\layout.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1777858803826,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\lib\\pose3d.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858804046,
+      "type": "file"
+    },
+    {
+      "path": "apps\\algo\\algo\\collision.py",
+      "accessCount": 2,
+      "lastAccessed": 1777858813622,
+      "type": "file"
+    },
+    {
+      "path": "apps\\algo\\algo\\daily_steps.py",
+      "accessCount": 2,
+      "lastAccessed": 1777858813636,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\measurements\\measurements.controller.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858816115,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\algo\\algo.service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858816182,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\auth\\auth.service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858828624,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\taylor\\taylor.service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777858842811,
+      "type": "file"
+    },
+    {
+      "path": "g:\\my-todo\\oh-my-claudecode-local\\skills\\deep-interview\\SKILL.md",
+      "accessCount": 1,
+      "lastAccessed": 1777797043126,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\86138\\.claude\\settings.json",
+      "accessCount": 1,
+      "lastAccessed": 1777797056577,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\86138\\my-todo",
+      "accessCount": 1,
+      "lastAccessed": 1777797056624,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\api\\package.json",
+      "accessCount": 1,
+      "lastAccessed": 1777797438902,
+      "type": "file"
+    },
+    {
+      "path": "docs\\WORKFLOW_2D_3D.md",
+      "accessCount": 1,
+      "lastAccessed": 1777797449994,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\components\\Workbench3D\\Viewer.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1777797450182,
+      "type": "file"
+    },
+    {
+      "path": "apps\\algo\\algo\\planner_3d_ct3d.py",
+      "accessCount": 1,
+      "lastAccessed": 1777797450912,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\files\\files.service.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777797462734,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\execution\\execution.module.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777799513954,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web",
+      "accessCount": 1,
+      "lastAccessed": 1777799514076,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1777799523072,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\lib",
+      "accessCount": 1,
+      "lastAccessed": 1777799523134,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\api\\src\\measurements\\measurements.service.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777799532700,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\globals.css",
+      "accessCount": 1,
+      "lastAccessed": 1777799546125,
+      "type": "file"
+    },
+    {
+      "path": "apps\\api\\src\\cases\\cases.service.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777799546186,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\tailwind.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777799557333,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\cases\\[id]",
+      "accessCount": 1,
+      "lastAccessed": 1777799640184,
+      "type": "directory"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\preop\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1777799665719,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\preop\\3d\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1777799665778,
+      "type": "file"
+    },
+    {
+      "path": "apps\\web\\src\\app\\dashboard\\cases\\[id]\\pdf-preview\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1777799841223,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

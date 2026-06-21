@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f0f9f9;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
+  --secondary: #0e7490;
+  --muted: #64748b;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0d9488;
+  --danger: #dc2626;
+  --success: #059669;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
+  --page-header: #0f172a;
+  --gradient-primary: linear-gradient(135deg, #0d9488 0%, #0e7490 100%);
+  --shadow-soft: 0 2px 8px rgba(13, 148, 136, 0.06);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* 滚动条样式（可选，更统一的外观） */
+@layer base {
+  * {
+    @apply border-medical-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-medical-primary-hover hover:shadow-md focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply rounded-lg border border-medical-border bg-white px-4 py-2.5 text-sm font-medium text-medical-muted transition-all duration-200 hover:bg-medical-surface hover:text-foreground hover:border-medical-primary/50 focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2;
+  }
+  .btn-ghost {
+    @apply rounded-lg px-4 py-2.5 text-sm font-medium text-medical-muted transition-colors hover:bg-medical-surface hover:text-foreground;
+  }
+  .input-field {
+    @apply block w-full rounded-lg border border-medical-border bg-white px-3 py-2.5 text-sm text-foreground placeholder:text-medical-muted transition-colors focus:border-medical-primary focus:outline-none focus:ring-2 focus:ring-medical-primary/20;
+  }
+  .card-medical {
+    @apply rounded-xl border border-medical-border bg-white p-6 shadow-[var(--shadow-card)] transition-shadow duration-200 hover:shadow-[var(--shadow-soft)];
+  }
+  .card-medical-flat {
+    @apply rounded-xl border border-medical-border bg-white p-6;
+  }
+  .page-header {
+    @apply text-2xl font-semibold tracking-tight text-[var(--page-header)];
+  }
+  .page-description {
+    @apply mt-1 text-sm text-medical-muted;
+  }
+  .nav-item-active {
+    @apply bg-medical-primary-light text-medical-primary font-medium;
+  }
+  .nav-item-inactive {
+    @apply text-medical-muted hover:bg-medical-surface hover:text-foreground;
+  }
+  .table-medical thead {
+    @apply border-b border-medical-border bg-medical-surface;
+  }
+  .table-medical th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-medical-muted;
+  }
+  .table-medical td {
+    @apply border-b border-medical-border px-4 py-3 text-sm text-foreground;
+  }
+  .table-medical tbody tr {
+    @apply transition-colors hover:bg-medical-surface/50;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-primary {
+    @apply badge bg-medical-primary-light text-medical-primary;
+  }
+  .badge-muted {
+    @apply badge bg-medical-surface text-medical-muted;
+  }
+  .badge-success {
+    @apply badge bg-emerald-50 text-medical-success;
+  }
+  .badge-danger {
+    @apply badge bg-red-50 text-medical-danger;
+  }
+  /* 认证页柔和渐变背景 + 装饰光斑，提升首屏观感 */
+  .auth-bg {
+    @apply relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12;
+    background:
+      radial-gradient(60rem 60rem at 110% -10%, rgba(8, 145, 178, 0.10), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 110%, rgba(13, 148, 136, 0.12), transparent 55%),
+      linear-gradient(180deg, #f0f9f9 0%, #f8fafc 100%);
+  }
+  .auth-card {
+    @apply relative z-10 w-full rounded-2xl border border-white/60 bg-white/80 p-8 shadow-[0_20px_60px_-15px_rgba(13,148,136,0.18)] backdrop-blur;
+  }
+  .brand-mark {
+    @apply flex items-center justify-center rounded-xl text-white shadow-[0_8px_20px_-6px_rgba(13,148,136,0.6)];
+    background: var(--gradient-primary);
+  }
+}

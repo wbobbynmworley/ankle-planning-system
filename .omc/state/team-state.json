@@ -1,0 +1,18 @@
+{
+  "active": true,
+  "current_phase": "team-exec",
+  "agent_count": 3,
+  "agent_types": "executor,executor,executor",
+  "fix_loop_count": 0,
+  "linked_ralph": false,
+  "max_fix_loops": 3,
+  "stage_history": "team-plan,team-exec",
+  "task": "骨畸形矫正平台重构 - 页面导航修复、数据持久化、PDF实时更新、患者端功能",
+  "team_name": "bone-platform-refactor",
+  "_meta": {
+    "mode": "team",
+    "sessionId": null,
+    "updatedAt": "2026-05-03T09:10:23.723Z",
+    "updatedBy": "state_write_tool"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "active": true,
+  "iteration": 1,
+  "current_phase": "deep-interview",
+  "started_at": "2026-05-03T12:00:00Z",
+  "initial_idea": "骨畸形矫正平台，支持二维和三维功能，页面美观，功能丰富",
+  "challenge_modes_used": [],
+  "codebase_context": null,
+  "current_ambiguity": 1,
+  "interview_id": "di-20260503-001",
+  "initial_context_summary": null,
+  "ontology_snapshots": [],
+  "rounds": [],
+  "threshold": 0.2,
+  "type": "greenfield",
+  "_meta": {
+    "mode": "deep-interview",
+    "sessionId": "deep-interview-fresh",
+    "updatedAt": "2026-05-03T08:34:51.424Z",
+    "updatedBy": "state_write_tool"
+  }
+}

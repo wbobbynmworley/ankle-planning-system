@@ -1,0 +1,10 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+numpy>=1.26.0
+opencv-python-headless>=4.10.0
+pydantic>=2.0.0
+vtk>=9.3.0
+pyvista>=0.43.0
+# SAM segmentation (2D workbench)
+torch>=2.0.0
+segment-anything>=1.0
