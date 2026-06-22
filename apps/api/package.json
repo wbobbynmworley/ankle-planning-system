@@ -16,7 +16,7 @@
     "seed": "node prisma-seed.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@aws-sdk/client-s3": "^3.1073.0",
     "@nestjs/common": "^10.4.7",
     "@nestjs/config": "^3.2.2",
     "@nestjs/core": "^10.4.7",
@@ -24,6 +24,7 @@
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.7",
     "@nestjs/throttler": "^6.2.1",
+    "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",

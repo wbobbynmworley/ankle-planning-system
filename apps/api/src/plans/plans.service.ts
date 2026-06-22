@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { PlanAlgoType, Prisma, Role } from '@prisma/client';
 import { AlgoService } from '../algo/algo.service';
 import { CaseStatus } from '@prisma/client';
@@ -26,22 +27,26 @@ export class PlansService {
     private algo: AlgoService,
     private taylor: TaylorService,
     private instruments: InstrumentsService,
+    private storage: StorageService,
   ) {}
 
   /**
    * 读取 STL 文件内容为 base64。算法服务（如 HF Space）与本 API（如 Render）通常**不共享磁盘**，
-   * 因此必须把文件内容随请求发过去，而不是发本地路径。本地同机部署时同样适用（读自身磁盘）。
+   * 因此必须把文件内容随请求发过去，而不是发本地路径。文件可能存于 R2 或本地磁盘，统一走存储层。
    */
-  private readStlB64(absPaths: string[]): string[] {
-    return absPaths.map((p) => {
+  private async readStlB64(keys: string[]): Promise<string[]> {
+    const out: string[] = [];
+    for (const key of keys) {
       try {
-        return fs.readFileSync(p).toString('base64');
+        const buf = await this.storage.get(key);
+        out.push(buf.toString('base64'));
       } catch {
         throw new BadRequestException(
-          `STL 文件不存在或无法读取：${path.basename(p)}（免费实例磁盘为临时存储，重启后上传文件会丢失，请重新上传 STL 后再规划）`,
+          `STL 文件不存在或无法读取：${path.basename(key)}（若使用免费实例且未配置对象存储，重启后上传文件会丢失，请重新上传 STL 后再规划）`,
         );
       }
-    });
+    }
+    return out;
   }
 
   async checkAlgoHealth(): Promise<{ ok: boolean; message?: string }> {
@@ -68,38 +73,36 @@ export class PlansService {
     if (userRole !== 'ADMIN' && c.doctorId !== userId) throw new ForbiddenException();
 
     const { mask_base64 } = await this.algo.postprocessMask(payload.mask_base64);
-    const maskSaveRoot = process.env.MASK_SAVE_ROOT ?? path.join(process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage'), 'mask_save');
     const d = new Date();
     const pad = (n: number, len: number) => String(n).padStart(len, '0');
-    const dayDir = path.join(maskSaveRoot, `${d.getFullYear()}${pad(d.getMonth() + 1, 2)}${pad(d.getDate(), 2)}`);
+    const dayDir = `${d.getFullYear()}${pad(d.getMonth() + 1, 2)}${pad(d.getDate(), 2)}`;
     const ts = `${pad(d.getHours(), 2)}${pad(d.getMinutes(), 2)}${pad(d.getSeconds(), 2)}_${pad(d.getMilliseconds() * 1000, 6)}`;
     const fileName = `${payload.view_key}_${payload.role}_${payload.engine_name}_${ts}.png`;
-    const outPath = path.join(dayDir, fileName);
-    fs.mkdirSync(dayDir, { recursive: true });
+    // 统一存储 key（R2 或磁盘），归档在 mask_save/ 下
+    const key = `mask_save/${dayDir}/${fileName}`;
     const buf = Buffer.from(mask_base64, 'base64');
-    fs.writeFileSync(outPath, buf);
-    return { path: outPath, mask_save_root: maskSaveRoot };
+    await this.storage.put(key, buf, 'image/png');
+    return { path: key, mask_save_root: 'mask_save' };
   }
 
-  /** 已保存掩码按路径读取为 base64，供前端恢复掩码使用 */
+  /** 已保存掩码按 key 读取为 base64，供前端恢复掩码使用 */
   async loadSavedMask(maskPath: string, userId: string, userRole: Role): Promise<{ mask_base64: string }> {
     if (!maskPath) throw new NotFoundException('Mask path is empty');
     // 仅医生/管理员可读取保存目录下的掩码
     if (userRole !== Role.ADMIN && userRole !== Role.DOCTOR) {
       throw new ForbiddenException();
     }
-    const maskSaveRoot = (process.env.MASK_SAVE_ROOT ?? path.join(process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage'), 'mask_save'));
-    const rootNorm = path.resolve(maskSaveRoot);
-    const full = path.resolve(maskPath);
-    if (!full.startsWith(rootNorm)) {
-      // 只允许读取 mask_save 目录下的文件，避免任意路径读盘
+    // 只允许读取 mask_save 下的对象，避免任意路径读取
+    const key = maskPath.replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!key.startsWith('mask_save/') && !key.includes('/mask_save/')) {
       throw new ForbiddenException('Mask path outside mask_save root');
     }
-    if (!fs.existsSync(full)) {
+    try {
+      const buf = await this.storage.get(key);
+      return { mask_base64: buf.toString('base64') };
+    } catch {
       throw new NotFoundException('Mask file not found');
     }
-    const buf = fs.readFileSync(full);
-    return { mask_base64: buf.toString('base64') };
   }
 
   async findForCase(caseId: string, userId: string, role: Role) {
@@ -232,17 +235,16 @@ export class PlansService {
     if (!c) throw new NotFoundException('Case not found');
     if (role !== Role.ADMIN && c.doctorId !== userId) throw new ForbiddenException();
 
-    const storageRoot = process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage');
     const allFiles = (c.files ?? []) as Array<{ id: string; type: string; path: string }>;
     const stlFiles = allFiles.filter((f) => f.type === 'STL').sort((a, b) => a.id.localeCompare(b.id));
-    const stlPaths = stlFiles.map((f) => path.resolve(storageRoot, f.path));
+    const stlKeys = stlFiles.map((f) => f.path);
 
-    if (stlPaths.length < 2) {
+    if (stlKeys.length < 2) {
       return { collisions: [] };
     }
-    if (!Array.isArray(body.targetPoses) || body.targetPoses.length !== stlPaths.length) {
+    if (!Array.isArray(body.targetPoses) || body.targetPoses.length !== stlKeys.length) {
       throw new BadRequestException(
-        `targetPoses 长度须与当前病例 STL 数量一致（当前 ${stlPaths.length} 个 STL）`,
+        `targetPoses 长度须与当前病例 STL 数量一致（当前 ${stlKeys.length} 个 STL）`,
       );
     }
 
@@ -250,7 +252,7 @@ export class PlansService {
       t: Array.isArray(p.t) ? p.t.slice(0, 3) : [0, 0, 0],
       q: Array.isArray(p.q) ? p.q.slice(0, 4) : [1, 0, 0, 0],
     }));
-    const stl_b64 = this.readStlB64(stlPaths);
+    const stl_b64 = await this.readStlB64(stlKeys);
     return this.algo.validate3dCollision({ stl_b64, target_poses });
   }
 
@@ -275,12 +277,11 @@ export class PlansService {
       if (!c) throw new NotFoundException('Case not found');
       if (role !== Role.ADMIN && c.doctorId !== userId) throw new ForbiddenException();
 
-      const storageRoot = process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage');
       const allFiles = (c.files ?? []) as Array<{ id: string; type: string; path: string }>;
       const stlFiles = allFiles.filter((f) => f.type === 'STL').sort((a, b) => a.id.localeCompare(b.id));
-      const stlPaths = stlFiles.map((f) => path.resolve(storageRoot, f.path ?? ''));
+      const stlKeys = stlFiles.map((f) => f.path ?? '');
 
-      if (stlPaths.length < 2) {
+      if (stlKeys.length < 2) {
         throw new BadRequestException('至少需要 2 个 STL 才能进行多骨规划');
       }
       const refIndex = stlFiles.findIndex((f) => f.id === body.refId);
@@ -290,11 +291,11 @@ export class PlansService {
       if (
         !Array.isArray(body.startPoses) ||
         !Array.isArray(body.targetPoses) ||
-        body.startPoses.length !== stlPaths.length ||
-        body.targetPoses.length !== stlPaths.length
+        body.startPoses.length !== stlKeys.length ||
+        body.targetPoses.length !== stlKeys.length
       ) {
         throw new BadRequestException(
-          `startPoses/targetPoses 长度须与 STL 数量一致（当前 ${stlPaths.length}）`,
+          `startPoses/targetPoses 长度须与 STL 数量一致（当前 ${stlKeys.length}）`,
         );
       }
 
@@ -308,7 +309,7 @@ export class PlansService {
       }));
 
       try {
-        const stl_b64 = this.readStlB64(stlPaths);
+        const stl_b64 = await this.readStlB64(stlKeys);
         return await this.algo.plan3dMulti({
           stl_b64,
           ref_index: refIndex,

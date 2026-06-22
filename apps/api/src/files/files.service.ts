@@ -1,9 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { Role } from '@prisma/client';
 import { FileType } from '@prisma/client';
 import * as path from 'path';
-import * as fs from 'fs';
 
 const ALLOWED_MIMES: Record<string, FileType> = {
   'model/stl': FileType.STL,
@@ -24,15 +24,10 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 @Injectable()
 export class FilesService {
-  private storageRoot: string;
-
-  constructor(private prisma: PrismaService) {
-    this.storageRoot = process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage');
-  }
-
-  getCaseDir(caseId: string): string {
-    return path.join(this.storageRoot, 'cases', caseId);
-  }
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   validateFile(mimetype: string, originalName: string, size: number): { type: FileType; err?: string } {
     if (size > MAX_FILE_SIZE) {
@@ -71,19 +66,16 @@ export class FilesService {
     if (err) throw new Error(err);
     const fileType = typeOverride ?? type;
 
-    const caseDir = this.getCaseDir(caseId);
-    const subDir = path.join(caseDir, fileType);
-    fs.mkdirSync(subDir, { recursive: true });
+    // 统一正斜杠的相对 key，既作 R2 对象键也作磁盘相对路径
     const safeName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const filePath = path.join(subDir, safeName);
-    fs.writeFileSync(filePath, file.buffer);
+    const key = `cases/${caseId}/${fileType}/${safeName}`;
+    await this.storage.put(key, file.buffer, file.mimetype);
 
-    const relativePath = path.relative(this.storageRoot, filePath);
     const record = await this.prisma.file.create({
       data: {
         caseId,
         type: fileType,
-        path: relativePath,
+        path: key,
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
@@ -100,7 +92,12 @@ export class FilesService {
     });
   }
 
-  async getPath(fileId: string, userId: string, role: Role): Promise<string> {
+  /** 读取文件内容供下载（R2 或磁盘）；返回内容与元数据 */
+  async getContent(
+    fileId: string,
+    userId: string,
+    role: Role,
+  ): Promise<{ buffer: Buffer; originalName: string; mimeType?: string | null }> {
     const file = await this.prisma.file.findUnique({ where: { id: fileId }, include: { case: true } });
     if (!file) throw new NotFoundException('File not found');
     const c = file.case;
@@ -110,9 +107,12 @@ export class FilesService {
       const patient = await this.prisma.patient.findFirst({ where: { userId } });
       if (!patient || c.patientId !== patient.id) throw new ForbiddenException();
     }
-    const fullPath = path.resolve(this.storageRoot, file.path);
-    if (!fs.existsSync(fullPath)) throw new NotFoundException('File not found on disk');
-    return fullPath;
+    try {
+      const buffer = await this.storage.get(file.path);
+      return { buffer, originalName: file.originalName ?? 'download', mimeType: file.mimeType };
+    } catch {
+      throw new NotFoundException('文件内容不存在（可能因免费实例重启丢失，请重新上传）');
+    }
   }
 
   async deleteFile(fileId: string, userId: string, role: Role) {
@@ -120,8 +120,7 @@ export class FilesService {
     if (!file) throw new NotFoundException('File not found');
     const c = file.case;
     if (role !== Role.ADMIN && c.doctorId !== userId) throw new ForbiddenException();
-    const fullPath = path.resolve(this.storageRoot, file.path);
-    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    await this.storage.delete(file.path).catch(() => undefined);
     await this.prisma.file.delete({ where: { id: fileId } });
     return { ok: true };
   }

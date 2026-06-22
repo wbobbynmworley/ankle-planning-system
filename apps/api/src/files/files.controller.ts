@@ -51,8 +51,13 @@ export class FilesController {
   @Get('download/:fileId')
   async download(@Param('fileId') fileId: string, @Req() req: Request, @Res() res: Response) {
     const user = (req as any).user;
-    const filePath = await this.files.getPath(fileId, user.id, user.role);
-    res.sendFile(filePath);
+    const { buffer, originalName, mimeType } = await this.files.getContent(fileId, user.id, user.role);
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(originalName)}"`,
+    );
+    res.send(buffer);
   }
 
   @Delete(':fileId')
