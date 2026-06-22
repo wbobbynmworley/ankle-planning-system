@@ -15,8 +15,8 @@ RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
-# 运行时同样需要 openssl 供 Prisma 查询引擎加载
-RUN apk add --no-cache openssl libc6-compat
+# 运行时需要 openssl 供 Prisma 查询引擎加载；ca-certificates 供 TiDB 强制 TLS 的证书校验（sslaccept=strict）
+RUN apk add --no-cache openssl libc6-compat ca-certificates
 ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
