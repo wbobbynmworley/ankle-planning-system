@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, TransformControls } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
@@ -66,39 +66,36 @@ function SingleMesh({
 }
 
 /**
- * 旋转目标 gizmo：用 ref 直接驱动 three 对象，避免"声明式位姿 ←→ onChange 回写"在拖动时
- * 与 React 重渲染相互打架导致的卡顿/抖动。非拖动时每帧同步外部 targetPose（让平移按钮也能带动 gizmo）。
+ * 旋转目标 gizmo：挂载时一次性把不可见网格设到初始目标位姿，之后**完全交给 TransformControls
+ * 直接操作 three 对象**——group 不再绑定声明式 position/quaternion，避免 React 每次重渲染把
+ * 位姿写回去、与拖动相互顶撞（之前旋转拖不动的根因）。拖动时通过 onObjectChange 把新位姿回传。
+ * 组件由父级用 key={activeId} 控制，切换选中模型时会重新挂载并重置初始位姿。
  */
 function TargetGizmo({
   item,
-  targetPose,
+  initialPose,
   onChange,
 }: {
   item: MeshItem;
-  targetPose: PoseTR;
+  initialPose: PoseTR;
   onChange: (pose: PoseTR) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const draggingRef = useRef(false);
 
-  useFrame(() => {
+  useEffect(() => {
     const g = groupRef.current;
-    if (g && !draggingRef.current) {
-      g.position.set(targetPose.t[0], targetPose.t[1], targetPose.t[2]);
-      g.quaternion.copy(quatWxyzToThree(targetPose.q));
-    }
-  });
+    if (!g) return;
+    g.position.set(initialPose.t[0], initialPose.t[1], initialPose.t[2]);
+    g.quaternion.copy(quatWxyzToThree(initialPose.q));
+    g.updateMatrixWorld();
+    // 仅在挂载/切换模型时初始化一次；拖动期间不再被覆盖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
 
   return (
     <TransformControls
       mode="rotate"
       size={0.8}
-      onMouseDown={() => {
-        draggingRef.current = true;
-      }}
-      onMouseUp={() => {
-        draggingRef.current = false;
-      }}
       onObjectChange={() => {
         const g = groupRef.current;
         if (!g) return;
@@ -196,7 +193,7 @@ function SceneContent({
         <TargetGizmo
           key={activeId}
           item={activeItem}
-          targetPose={activeTargetPose}
+          initialPose={activeTargetPose}
           onChange={(pose) => onTargetPoseChange(activeId, pose)}
         />
       )}
@@ -269,7 +266,24 @@ export function Workbench3DViewer({
       className="h-[420px] w-full rounded-lg border border-medical-border bg-black/95"
       style={{ pointerEvents: 'auto' }}
     >
-      <Canvas camera={{ position: [120, 120, 120], fov: 40 }} style={{ display: 'block' }}>
+      <Canvas
+        camera={{ position: [120, 120, 120], fov: 40 }}
+        style={{ display: 'block' }}
+        gl={{ powerPreference: 'high-performance', antialias: true }}
+        onCreated={({ gl, invalidate }) => {
+          const canvas = gl.domElement;
+          // 关键：默认情况下 WebGL 上下文丢失后不会自动恢复，画布会永久冻结（拖动失灵）。
+          // preventDefault 允许浏览器触发 contextrestored，恢复后重绘。
+          canvas.addEventListener(
+            'webglcontextlost',
+            (e) => {
+              e.preventDefault();
+            },
+            false,
+          );
+          canvas.addEventListener('webglcontextrestored', () => invalidate(), false);
+        }}
+      >
         <SceneContent
           meshes={meshes}
           poses={poses}
