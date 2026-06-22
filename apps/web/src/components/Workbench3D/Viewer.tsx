@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, TransformControls } from '@react-three/drei';
 import { STLLoader } from 'three-stdlib';
 import * as THREE from 'three';
@@ -62,6 +62,58 @@ function SingleMesh({
         )}
       </mesh>
     </group>
+  );
+}
+
+/**
+ * 旋转目标 gizmo：用 ref 直接驱动 three 对象，避免"声明式位姿 ←→ onChange 回写"在拖动时
+ * 与 React 重渲染相互打架导致的卡顿/抖动。非拖动时每帧同步外部 targetPose（让平移按钮也能带动 gizmo）。
+ */
+function TargetGizmo({
+  item,
+  targetPose,
+  onChange,
+}: {
+  item: MeshItem;
+  targetPose: PoseTR;
+  onChange: (pose: PoseTR) => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const draggingRef = useRef(false);
+
+  useFrame(() => {
+    const g = groupRef.current;
+    if (g && !draggingRef.current) {
+      g.position.set(targetPose.t[0], targetPose.t[1], targetPose.t[2]);
+      g.quaternion.copy(quatWxyzToThree(targetPose.q));
+    }
+  });
+
+  return (
+    <TransformControls
+      mode="rotate"
+      size={0.8}
+      onMouseDown={() => {
+        draggingRef.current = true;
+      }}
+      onMouseUp={() => {
+        draggingRef.current = false;
+      }}
+      onObjectChange={() => {
+        const g = groupRef.current;
+        if (!g) return;
+        onChange({
+          t: [g.position.x, g.position.y, g.position.z],
+          q: threeToQuatWxyz(g.quaternion),
+        });
+      }}
+    >
+      <group ref={groupRef}>
+        <mesh geometry={item.geometry}>
+          <meshBasicMaterial visible={false} />
+        </mesh>
+      </group>
+    </TransformControls>
   );
 }
 
@@ -141,30 +193,23 @@ function SceneContent({
       })}
 
       {showTransform && activeId && activeItem && activeTargetPose && (
-        <TransformControls
-          mode="rotate"
-          size={0.75}
-          onObjectChange={(e) => {
-            const obj = (e?.target as { object?: THREE.Object3D } | undefined)?.object;
-            if (!obj || !activeId) return;
-            onTargetPoseChange(activeId, {
-              t: [obj.position.x, obj.position.y, obj.position.z],
-              q: threeToQuatWxyz(obj.quaternion),
-            });
-          }}
-        >
-          <group
-            position={[...activeTargetPose.t]}
-            quaternion={quatWxyzToThree(activeTargetPose.q)}
-          >
-            <mesh geometry={activeItem.geometry}>
-              <meshBasicMaterial visible={false} />
-            </mesh>
-          </group>
-        </TransformControls>
+        <TargetGizmo
+          key={activeId}
+          item={activeItem}
+          targetPose={activeTargetPose}
+          onChange={(pose) => onTargetPoseChange(activeId, pose)}
+        />
       )}
 
-      <OrbitControls makeDefault />
+      {/* 相机控制：开启阻尼 + 调速，拖动更顺滑跟手 */}
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.12}
+        rotateSpeed={0.65}
+        zoomSpeed={0.8}
+        panSpeed={0.7}
+      />
     </>
   );
 }
