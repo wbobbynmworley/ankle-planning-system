@@ -48,14 +48,15 @@ export class AlgoService {
     return this.request('/plan/3d', payload);
   }
 
-  /** 校验多 STL 在目标位姿下三角形级碰撞（与 CT3D 一致） */
-  async validate3dCollision(payload: { stl_paths: string[]; target_poses: Array<{ t: number[]; q: number[] }> }): Promise<{ collisions: number[][] }> {
+  /** 校验多 STL 在目标位姿下三角形级碰撞（与 CT3D 一致）。分机部署时用 stl_b64 传文件内容 */
+  async validate3dCollision(payload: { stl_paths?: string[]; stl_b64?: string[]; target_poses: Array<{ t: number[]; q: number[] }> }): Promise<{ collisions: number[][] }> {
     return this.request('/plan/3d/validate-collision', payload);
   }
 
   /** 与 CT3D 一致：参考固定，其余顺序体素 A* 多骨规划 */
   async plan3dMulti(payload: {
-    stl_paths: string[];
+    stl_paths?: string[];
+    stl_b64?: string[];
     ref_index: number;
     start_poses: Array<{ t: number[]; q: number[] }>;
     target_poses: Array<{ t: number[]; q: number[] }>;

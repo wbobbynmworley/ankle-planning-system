@@ -28,6 +28,22 @@ export class PlansService {
     private instruments: InstrumentsService,
   ) {}
 
+  /**
+   * 读取 STL 文件内容为 base64。算法服务（如 HF Space）与本 API（如 Render）通常**不共享磁盘**，
+   * 因此必须把文件内容随请求发过去，而不是发本地路径。本地同机部署时同样适用（读自身磁盘）。
+   */
+  private readStlB64(absPaths: string[]): string[] {
+    return absPaths.map((p) => {
+      try {
+        return fs.readFileSync(p).toString('base64');
+      } catch {
+        throw new BadRequestException(
+          `STL 文件不存在或无法读取：${path.basename(p)}（免费实例磁盘为临时存储，重启后上传文件会丢失，请重新上传 STL 后再规划）`,
+        );
+      }
+    });
+  }
+
   async checkAlgoHealth(): Promise<{ ok: boolean; message?: string }> {
     return this.algo.checkHealth();
   }
@@ -234,7 +250,8 @@ export class PlansService {
       t: Array.isArray(p.t) ? p.t.slice(0, 3) : [0, 0, 0],
       q: Array.isArray(p.q) ? p.q.slice(0, 4) : [1, 0, 0, 0],
     }));
-    return this.algo.validate3dCollision({ stl_paths: stlPaths, target_poses });
+    const stl_b64 = this.readStlB64(stlPaths);
+    return this.algo.validate3dCollision({ stl_b64, target_poses });
   }
 
   /** 与 CT3D 一致：参考固定，其余顺序体素 A* 多骨规划（不落库，直接返回给前端） */
@@ -291,8 +308,9 @@ export class PlansService {
       }));
 
       try {
+        const stl_b64 = this.readStlB64(stlPaths);
         return await this.algo.plan3dMulti({
-          stl_paths: stlPaths,
+          stl_b64,
           ref_index: refIndex,
           start_poses,
           target_poses,

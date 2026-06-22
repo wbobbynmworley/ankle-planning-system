@@ -49,6 +49,7 @@ class Plan3DRequest(BaseModel):
     stl_path: Optional[str] = None
     # 新字段：多个 STL 路径（按原始坐标导入，保持相对位置）
     stl_paths: Optional[List[str]] = None
+    stl_b64: Optional[List[str]] = None  # 分机部署时传 STL 文件内容（base64）
     # 起点/终点位姿（仅平移，mm），与 CT3D 逻辑一致
     start_t: Optional[List[float]] = None
     goal_t: Optional[List[float]] = None
@@ -57,18 +58,51 @@ class Plan3DRequest(BaseModel):
 
 class Validate3DCollisionRequest(BaseModel):
     """校验多 mesh 在目标位姿下是否发生三角形级碰撞（与 CT3D 一致）"""
-    stl_paths: List[str]
+    # 同机部署可传本地路径；分机部署（如 API 在 Render、算法在 HF Space）必须传 stl_b64 文件内容
+    stl_paths: Optional[List[str]] = None
+    stl_b64: Optional[List[str]] = None
     target_poses: List[dict]  # [{"t": [x,y,z], "q": [w,x,y,z]}, ...]
 
 
 class Plan3DMultiRequest(BaseModel):
     """与 CT3D 一致：参考固定，其余顺序 A*（体素+旋转），每日限制"""
-    stl_paths: List[str]
-    ref_index: int  # 参考件在 stl_paths 中的下标
+    stl_paths: Optional[List[str]] = None
+    stl_b64: Optional[List[str]] = None  # 分机部署时传 STL 文件内容（base64）
+    ref_index: int  # 参考件在 stl_paths/stl_b64 中的下标
     start_poses: List[dict]  # [{"t": [x,y,z], "q": [w,x,y,z]}, ...]
     target_poses: List[dict]
     max_mm: float = 1.0
     max_deg: float = 1.0
+
+
+def _materialize_stls(
+    stl_paths: Optional[List[str]], stl_b64: Optional[List[str]]
+) -> tuple[List[str], List[str]]:
+    """解析 STL 来源：优先用 base64 内容写临时文件（API 与算法分机部署时唯一可行），
+    否则回退到本地路径（同机部署）。返回 (可读取的路径列表, 需在请求结束后清理的临时文件列表)。"""
+    if stl_b64:
+        import tempfile
+
+        tmp_paths: List[str] = []
+        for i, b64 in enumerate(stl_b64):
+            if not b64:
+                continue
+            data = base64.b64decode(b64)
+            fd, p = tempfile.mkstemp(suffix=".stl", prefix=f"ankle_stl_{i}_")
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            tmp_paths.append(p)
+        return tmp_paths, tmp_paths
+    resolved = [_decode_path_if_garbled(p) for p in (stl_paths or []) if p]
+    return resolved, []
+
+
+def _cleanup_tmp(paths: List[str]) -> None:
+    for p in paths:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
 
 
 def _decode_path_if_garbled(path: str) -> str:
@@ -352,13 +386,15 @@ def validate_3d_collision(req: Validate3DCollisionRequest) -> dict:
     """校验多 STL 在目标位姿下是否发生三角形级碰撞（VTK CollisionDetectionFilter，与 CT3D 一致）"""
     from .collision import PoseTR, check_pair_collision_exact
 
-    paths = [_decode_path_if_garbled(p) for p in req.stl_paths if p]
+    paths, _tmp = _materialize_stls(req.stl_paths, req.stl_b64)
     if len(paths) != len(req.target_poses):
+        _cleanup_tmp(_tmp)
         raise HTTPException(
             status_code=400,
-            detail=f"stl_paths length ({len(paths)}) must match target_poses length ({len(req.target_poses)})",
+            detail=f"stl count ({len(paths)}) must match target_poses length ({len(req.target_poses)})",
         )
     if len(paths) < 2:
+        _cleanup_tmp(_tmp)
         return {"collisions": []}
 
     try:
@@ -391,6 +427,8 @@ def validate_3d_collision(req: Validate3DCollisionRequest) -> dict:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Load STL: {e}")
+    finally:
+        _cleanup_tmp(_tmp)
 
     if len(polys) < 2:
         return {"collisions": []}
@@ -415,12 +453,15 @@ def plan_3d_multi(req: Plan3DMultiRequest) -> dict:
     from .planner_3d_ct3d import generate_plan_multi
     from .collision import PoseTR
 
-    paths = [_decode_path_if_garbled(p) for p in req.stl_paths if p]
+    paths, _tmp = _materialize_stls(req.stl_paths, req.stl_b64)
     if req.ref_index < 0 or req.ref_index >= len(paths):
+        _cleanup_tmp(_tmp)
         raise HTTPException(status_code=400, detail="ref_index 越界")
     if len(paths) != len(req.start_poses) or len(paths) != len(req.target_poses):
-        raise HTTPException(status_code=400, detail="stl_paths 与 start_poses/target_poses 长度须一致")
+        _cleanup_tmp(_tmp)
+        raise HTTPException(status_code=400, detail="stl 数量与 start_poses/target_poses 长度须一致")
     if len(paths) < 2:
+        _cleanup_tmp(_tmp)
         raise HTTPException(status_code=400, detail="至少需要 2 个 STL")
 
     try:
@@ -492,6 +533,8 @@ def plan_3d_multi(req: Plan3DMultiRequest) -> dict:
         tb = traceback.format_exc()
         detail = f"{e!s}\n\n{tb}"
         raise HTTPException(status_code=500, detail=detail)
+    finally:
+        _cleanup_tmp(_tmp)
 
 
 class RatioBallRequest(BaseModel):
