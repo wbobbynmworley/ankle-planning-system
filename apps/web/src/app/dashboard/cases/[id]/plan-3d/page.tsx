@@ -43,6 +43,7 @@ export default function Plan3DPage() {
   const [refId, setRefId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [stepMm, setStepMm] = useState(1.0);
+  const [rotStepDeg, setRotStepDeg] = useState(5);
   const [mouseRotateTarget, setMouseRotateTarget] = useState(false);
   const [showTargetWireframe, setShowTargetWireframe] = useState(true);
   const [hideNonRefOriginal, setHideNonRefOriginal] = useState(false);
@@ -417,6 +418,42 @@ export default function Plan3DPage() {
       });
     },
     [selectedIds, refId, stepMm]
+  );
+
+  // 绕世界轴旋转目标位姿（按钮方式，100% 可靠，不依赖鼠标 gizmo）
+  const rotateTargetSelected = useCallback(
+    (ax: number, ay: number, az: number, deg: number) => {
+      if (selectedIds.length !== 1) {
+        setStatusMsg('请选择且仅选择 1 个模型来旋转目标。');
+        return;
+      }
+      const id = selectedIds[0]!;
+      if (id === refId) {
+        setStatusMsg('参考模型固定，无法旋转。');
+        return;
+      }
+      const r = (deg * Math.PI) / 360; // 半角
+      const s = Math.sin(r);
+      const dq: [number, number, number, number] = [Math.cos(r), ax * s, ay * s, az * s];
+      setMeshStates((prev) => {
+        const st = prev[id];
+        if (!st) return prev;
+        const [w, x, y, z] = st.targetPose.q;
+        // newQ = dq * q（绕世界轴）
+        const nq: [number, number, number, number] = [
+          dq[0] * w - dq[1] * x - dq[2] * y - dq[3] * z,
+          dq[0] * x + dq[1] * w + dq[2] * z - dq[3] * y,
+          dq[0] * y - dq[1] * z + dq[2] * w + dq[3] * x,
+          dq[0] * z + dq[1] * y - dq[2] * x + dq[3] * w,
+        ];
+        const n = Math.hypot(nq[0], nq[1], nq[2], nq[3]) || 1;
+        return {
+          ...prev,
+          [id]: { ...st, targetPose: { ...st.targetPose, q: [nq[0] / n, nq[1] / n, nq[2] / n, nq[3] / n] } },
+        };
+      });
+    },
+    [selectedIds, refId]
   );
 
   const resetTargetPose = useCallback(() => {
@@ -813,6 +850,27 @@ export default function Plan3DPage() {
               >
                 Z-（下）
               </button>
+            </div>
+            {/* 旋转按钮（绕世界 X/Y/Z 轴，可靠精确，不依赖鼠标 gizmo） */}
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span>旋转步长（°）：</span>
+              <input
+                type="number"
+                min={1}
+                max={45}
+                step={1}
+                value={rotStepDeg}
+                onChange={(e) => setRotStepDeg(Number(e.target.value) || 1)}
+                className="input-field h-6 w-16 rounded border border-medical-border px-1 text-xs"
+              />
+            </div>
+            <div className="mt-1 grid grid-cols-3 gap-1">
+              <button type="button" disabled={!transformControlsEnabled} onClick={() => rotateTargetSelected(1, 0, 0, rotStepDeg)} className="btn-secondary rounded px-1 py-0.5 text-xs">绕X+</button>
+              <button type="button" disabled={!transformControlsEnabled} onClick={() => rotateTargetSelected(0, 1, 0, rotStepDeg)} className="btn-secondary rounded px-1 py-0.5 text-xs">绕Y+</button>
+              <button type="button" disabled={!transformControlsEnabled} onClick={() => rotateTargetSelected(0, 0, 1, rotStepDeg)} className="btn-secondary rounded px-1 py-0.5 text-xs">绕Z+</button>
+              <button type="button" disabled={!transformControlsEnabled} onClick={() => rotateTargetSelected(1, 0, 0, -rotStepDeg)} className="btn-secondary rounded px-1 py-0.5 text-xs">绕X−</button>
+              <button type="button" disabled={!transformControlsEnabled} onClick={() => rotateTargetSelected(0, 1, 0, -rotStepDeg)} className="btn-secondary rounded px-1 py-0.5 text-xs">绕Y−</button>
+              <button type="button" disabled={!transformControlsEnabled} onClick={() => rotateTargetSelected(0, 0, 1, -rotStepDeg)} className="btn-secondary rounded px-1 py-0.5 text-xs">绕Z−</button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <label className="flex items-center gap-1">
