@@ -421,6 +421,39 @@ export async function getInstrumentsCombinations(activeOnly = true) {
   return api(`/instruments/combinations${activeOnly ? '' : '?active=false'}`);
 }
 
+export async function createInstrumentRing(body: { name: string; code: string; diameterMm?: number }) {
+  return api('/instruments/rings', { method: 'POST', body: JSON.stringify(body) });
+}
+export async function updateInstrumentRing(
+  id: string,
+  body: { name?: string; code?: string; diameterMm?: number; isActive?: boolean },
+) {
+  return api(`/instruments/rings/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+export async function createInstrumentRod(body: { name: string; code: string; lengthMm?: number }) {
+  return api('/instruments/rods', { method: 'POST', body: JSON.stringify(body) });
+}
+export async function updateInstrumentRod(
+  id: string,
+  body: { name?: string; code?: string; lengthMm?: number; isActive?: boolean },
+) {
+  return api(`/instruments/rods/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+export async function createInstrumentCombination(body: {
+  name: string;
+  code: string;
+  ringRefIds: string[];
+  rodRefIds: string[];
+}) {
+  return api('/instruments/combinations', { method: 'POST', body: JSON.stringify(body) });
+}
+export async function updateInstrumentCombination(
+  id: string,
+  body: { name?: string; code?: string; ringRefIds?: string[]; rodRefIds?: string[]; isActive?: boolean },
+) {
+  return api(`/instruments/combinations/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
 export async function calculateScales(body: {
   caseId: string;
   measurementId?: string;
