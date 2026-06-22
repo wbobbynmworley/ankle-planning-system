@@ -15,8 +15,8 @@ build/
 .env.local
 .env.*.local
 
-# Logs
-logs/
+# Logs (仅忽略仓库根的运行时日志目录，避免误伤 apps/api/src/logs 源码)
+/logs/
 *.log
 npm-debug.log*
 
