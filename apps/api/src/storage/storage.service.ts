@@ -68,9 +68,16 @@ export class StorageService {
     const k = this.normKey(key);
     if (this.s3) {
       const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: k }));
+      const body = res.Body as
+        | (AsyncIterable<Uint8Array> & { transformToByteArray?: () => Promise<Uint8Array> })
+        | undefined;
+      if (!body) throw new Error(`Empty body for key ${k}`);
+      // AWS SDK v3 推荐：优先用 transformToByteArray，避免不同运行时下流迭代的边界问题
+      if (typeof body.transformToByteArray === 'function') {
+        return Buffer.from(await body.transformToByteArray());
+      }
       const chunks: Buffer[] = [];
-      // Body 是 Node 可读流
-      for await (const chunk of res.Body as AsyncIterable<Uint8Array>) {
+      for await (const chunk of body) {
         chunks.push(Buffer.from(chunk));
       }
       return Buffer.concat(chunks);
