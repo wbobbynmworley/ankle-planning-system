@@ -518,7 +518,7 @@ def plan_3d_multi(req: Plan3DMultiRequest) -> dict:
     """与 CT3D 完全一致：参考固定，其余顺序体素 A*（平移+旋转），shortcut/nudge，每日 max_mm/max_deg 细分"""
     import traceback
 
-    from .planner_3d_ct3d import generate_plan_multi
+    from .planner_3d_ct3d import generate_plan_multi, PlanFailure
     from .collision import PoseTR
 
     paths, _tmp = _materialize_stls(req.stl_paths, req.stl_b64)
@@ -580,7 +580,7 @@ def plan_3d_multi(req: Plan3DMultiRequest) -> dict:
             names=[str(i) for i in range(len(polys))],
         )
         if result is None:
-            raise HTTPException(status_code=500, detail="规划失败（某骨无碰撞路径或细分后碰撞）")
+            raise HTTPException(status_code=400, detail="规划失败：参数无效（至少需要 2 个 STL 且参考件下标有效）")
 
         plan_paths = {k: [_pose_to_dict(p) for p in v] for k, v in result["plan_paths"].items()}
         plan_start_poses = {k: _pose_to_dict(v) for k, v in result["plan_start_poses"].items()}
@@ -598,6 +598,9 @@ def plan_3d_multi(req: Plan3DMultiRequest) -> dict:
         }
     except HTTPException:
         raise
+    except PlanFailure as e:
+        # 业务性失败（目标碰撞/无路径/细分碰撞）→ 400 + 可读原因，便于用户调整
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         tb = traceback.format_exc()
         detail = f"{e!s}\n\n{tb}"

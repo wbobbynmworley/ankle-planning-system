@@ -49,6 +49,10 @@ SHORTCUT_MAX_PASSES = 3
 SHORTCUT_RANDOM_ITERS = 300
 
 
+class PlanFailure(Exception):
+    """规划失败并带可读原因（区别于程序异常），供上层返回 400 提示用户如何调整。"""
+
+
 def _quat_slerp(q0: np.ndarray, q1: np.ndarray, t: float) -> np.ndarray:
     q0 = _quat_norm(q0)
     q1 = _quat_norm(q1)
@@ -656,7 +660,10 @@ def plan_single_bone(
     start_collide = not checker.is_pose_collision_free(start_pose)
     goal_collide = not checker.is_pose_collision_free(goal_pose)
     if goal_collide:
-        return None
+        raise PlanFailure(
+            f"骨[{name}] 的目标位姿本身就与其它骨重叠（碰撞）。请调整该骨的目标位姿，"
+            f"使其在终点不与参考骨或其它骨相交后再规划。"
+        )
     escape_pose = _find_escape_pose(start_pose, goal_pose, checker, ESCAPE_MAX_MM) if start_collide else None
     prefix = [start_pose, escape_pose] if escape_pose is not None else []
     start_plan = escape_pose if escape_pose is not None else start_pose
@@ -677,7 +684,10 @@ def plan_single_bone(
             allow_start_collision=allow_start_core,
         )
         if plan is None:
-            return None
+            raise PlanFailure(
+                f"骨[{name}] 找不到从初始到目标的无碰撞路径（目标可能在参考骨另一侧且无可行绕行空间）。"
+                f"可尝试缩小该骨的目标位移/旋转，或调整目标方向。"
+            )
         core_path = plan.path
         planner_used = plan.planner_used
     else:
@@ -700,7 +710,10 @@ def plan_single_bone(
     else:
         ok = _path_collision_free(checker, full)
     if not ok:
-        return None
+        raise PlanFailure(
+            f"骨[{name}] 的路径在按『每日最大平移/旋转』细分后出现碰撞。"
+            f"请调大每日上限（更大步长更易通过），或调整该骨目标位姿。"
+        )
     cost = _path_score_post(full, moving_center_local, ref_center_world)
     return full, planner_used, cost
 
