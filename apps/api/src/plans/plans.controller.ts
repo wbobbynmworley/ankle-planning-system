@@ -260,10 +260,11 @@ export class PlansController {
   @UseGuards(RolesGuard)
   @Roles('DOCTOR', 'ADMIN')
   async stlTo2d(
-    @Body() body: { case_id?: string; stl_paths?: string[] },
+    @Body() body: { case_id?: string; stl_paths?: string[]; stl_b64?: string[] },
     @Req() req: Request,
   ) {
-    return this.plans.stlTo2d(body);
+    const user = (req as any).user;
+    return this.plans.stlTo2d(body, user?.id, user?.role);
   }
 
   @Patch(':id')

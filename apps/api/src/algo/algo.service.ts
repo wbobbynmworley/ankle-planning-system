@@ -111,8 +111,8 @@ export class AlgoService {
     return this.request('/ratio-ball', payload);
   }
 
-  /** STL 三维转二维：正位图、侧位图 base64 或 URL */
-  async stlTo2d(payload: { case_id?: string; stl_paths?: string[] }): Promise<{
+  /** STL 三维转二维：正位图、侧位图 base64 或 URL。分机部署用 stl_b64 传内容 */
+  async stlTo2d(payload: { case_id?: string; stl_paths?: string[]; stl_b64?: string[] }): Promise<{
     front_base64?: string;
     side_base64?: string;
     front_url?: string;

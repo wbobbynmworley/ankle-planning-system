@@ -163,22 +163,38 @@ export class PlansService {
     if (!c) throw new NotFoundException('Case not found');
     if (role !== Role.ADMIN && c.doctorId !== userId) throw new ForbiddenException();
 
-    const storageRoot = process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage');
     const files = (c.files ?? []) as Array<{ type: string; path: string }>;
     const frontFile = files.find((f) => f.type === 'FRONT');
     const sideFile = files.find((f) => f.type === 'SIDE');
 
+    // 从存储层（R2/磁盘）读取内容为 base64；读不到则返回 undefined（不阻断）
+    const readB64 = async (key?: string): Promise<string | undefined> => {
+      if (!key) return undefined;
+      try {
+        return (await this.storage.get(key)).toString('base64');
+      } catch {
+        return undefined;
+      }
+    };
+
     let result: { totalDistance: number; totalDays: number; dailySteps: unknown[]; rawPath: unknown[] };
     if (algoType === '2d') {
-      const frontImagePath = frontFile ? path.resolve(storageRoot, frontFile.path) : undefined;
-      const sideImagePath = sideFile ? path.resolve(storageRoot, sideFile.path) : undefined;
+      const [frontImageB64, sideImageB64, frontRefMaskB64, frontMovMaskB64, sideRefMaskB64, sideMovMaskB64] =
+        await Promise.all([
+          readB64(frontFile?.path),
+          readB64(sideFile?.path),
+          readB64(body?.frontRefMaskPath),
+          readB64(body?.frontMovMaskPath),
+          readB64(body?.sideRefMaskPath),
+          readB64(body?.sideMovMaskPath),
+        ]);
       const payload = {
-        front_image_path: frontImagePath ?? null,
-        side_image_path: sideImagePath ?? null,
-        front_ref_mask_path: body?.frontRefMaskPath || null,
-        front_mov_mask_path: body?.frontMovMaskPath || null,
-        side_ref_mask_path: body?.sideRefMaskPath || null,
-        side_mov_mask_path: body?.sideMovMaskPath || null,
+        front_image_b64: frontImageB64 ?? null,
+        side_image_b64: sideImageB64 ?? null,
+        front_ref_mask_b64: frontRefMaskB64 ?? null,
+        front_mov_mask_b64: frontMovMaskB64 ?? null,
+        side_ref_mask_b64: sideRefMaskB64 ?? null,
+        side_mov_mask_b64: sideMovMaskB64 ?? null,
         front_mm_per_px: body?.frontMmPerPx ?? 0.1,
         side_mm_per_px: body?.sideMmPerPx ?? 0.1,
         start_mm: Array.isArray(body?.startMm) && body.startMm.length >= 3 ? body.startMm.slice(0, 3) : [0, 0, 0],
@@ -190,11 +206,11 @@ export class PlansService {
       result = await this.algo.plan2d(payload);
     } else {
       const stlFiles = files.filter((f) => f.type === 'STL');
-      const stlPaths = stlFiles.map((f) => path.resolve(storageRoot, f.path));
+      const stlB64 = await this.readStlB64(stlFiles.map((f) => f.path));
       const startMm = Array.isArray(body?.startMm) && body.startMm.length >= 3 ? body.startMm.slice(0, 3) : [0, 0, 0];
       const goalMm = Array.isArray(body?.goalMm) && body.goalMm.length >= 3 ? body.goalMm.slice(0, 3) : [5, 0, 0];
       const payload = {
-        stl_paths: stlPaths,
+        stl_b64: stlB64,
         start_t: startMm,
         goal_t: goalMm,
         day_step_mm: 1.0,
@@ -485,7 +501,24 @@ export class PlansService {
     return this.algo.ratioBall(payload);
   }
 
-  async stlTo2d(payload: { case_id?: string; stl_paths?: string[] }) {
+  /** STL→2D：解析病例下 STL 文件内容（base64）发给算法服务（分机部署不共享磁盘） */
+  async stlTo2d(payload: { case_id?: string; stl_paths?: string[]; stl_b64?: string[] }, userId?: string, role?: Role) {
+    // 若提供了 case_id，则由 API 解析该病例的 STL 并读取内容为 base64
+    if (payload.case_id) {
+      const c = await this.prisma.case.findUnique({
+        where: { id: payload.case_id },
+        include: { files: true },
+      });
+      if (!c) throw new NotFoundException('Case not found');
+      if (role && role !== Role.ADMIN && userId && c.doctorId !== userId) throw new ForbiddenException();
+      const allFiles = (c.files ?? []) as Array<{ id: string; type: string; path: string }>;
+      const stlFiles = allFiles.filter((f) => f.type === 'STL').sort((a, b) => a.id.localeCompare(b.id));
+      if (stlFiles.length === 0) {
+        throw new BadRequestException('该病例下没有 STL 文件，请先在病例页上传 STL');
+      }
+      const stl_b64 = await this.readStlB64(stlFiles.map((f) => f.path));
+      return this.algo.stlTo2d({ stl_b64 });
+    }
     return this.algo.stlTo2d(payload);
   }
 

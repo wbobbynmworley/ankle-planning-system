@@ -37,6 +37,13 @@ class Plan2DRequest(BaseModel):
     front_mov_mask_path: Optional[str] = None
     side_ref_mask_path: Optional[str] = None
     side_mov_mask_path: Optional[str] = None
+    # 分机部署：直接传图像/掩码内容（base64 的 PNG/JPG），优先于 *_path
+    front_image_b64: Optional[str] = None
+    side_image_b64: Optional[str] = None
+    front_ref_mask_b64: Optional[str] = None
+    front_mov_mask_b64: Optional[str] = None
+    side_ref_mask_b64: Optional[str] = None
+    side_mov_mask_b64: Optional[str] = None
     front_mm_per_px: float = 1.0
     side_mm_per_px: float = 1.0
     start_mm: List[float] = [0.0, 0.0, 0.0]
@@ -137,6 +144,32 @@ def _load_image(path: str) -> np.ndarray:
     if img.dtype != np.uint8:
         img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
     return img
+
+
+def _decode_gray_b64(b64: str) -> np.ndarray:
+    """base64(PNG/JPG) -> 灰度 uint8 图像"""
+    raw = base64.b64decode(b64)
+    data = np.frombuffer(raw, dtype=np.uint8)
+    img = cv2.imdecode(data, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise HTTPException(status_code=400, detail="图像 base64 解码失败")
+    if img.ndim == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if img.dtype != np.uint8:
+        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    return img
+
+
+def _decode_mask_b64(b64: str, ref_shape: tuple) -> np.ndarray:
+    """base64(PNG) -> 布尔掩码，必要时缩放到 ref_shape"""
+    raw = base64.b64decode(b64)
+    data = np.frombuffer(raw, dtype=np.uint8)
+    img = cv2.imdecode(data, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        raise HTTPException(status_code=400, detail="掩码 base64 解码失败")
+    if img.shape != ref_shape:
+        img = cv2.resize(img, (ref_shape[1], ref_shape[0]))
+    return (img > 127).astype(bool)
 
 
 def _load_mask(path: str, ref_shape: tuple) -> np.ndarray:
@@ -245,7 +278,9 @@ def plan_2d(req: Plan2DRequest) -> dict:
     start = (req.start_mm[0], req.start_mm[1], req.start_mm[2])
     goal = (req.goal_mm[0], req.goal_mm[1], req.goal_mm[2])
 
-    if not req.front_image_path or not req.side_image_path:
+    has_front = bool(req.front_image_b64 or req.front_image_path)
+    has_side = bool(req.side_image_b64 or req.side_image_path)
+    if not has_front or not has_side:
         return {
             "totalDistance": 0.0,
             "totalDays": 0,
@@ -253,12 +288,24 @@ def plan_2d(req: Plan2DRequest) -> dict:
             "rawPath": [],
         }
 
-    front_gray = _load_image(req.front_image_path)
-    side_gray = _load_image(req.side_image_path)
+    # 优先用 base64（分机部署），否则回退本地路径（同机部署）
+    front_gray = _decode_gray_b64(req.front_image_b64) if req.front_image_b64 else _load_image(req.front_image_path)
+    side_gray = _decode_gray_b64(req.side_image_b64) if req.side_image_b64 else _load_image(req.side_image_path)
     front_calib = Calibration(mm_per_px_x=req.front_mm_per_px, mm_per_px_y=req.front_mm_per_px)
     side_calib = Calibration(mm_per_px_x=req.side_mm_per_px, mm_per_px_y=req.side_mm_per_px)
 
-    if req.front_ref_mask_path and req.front_mov_mask_path and req.side_ref_mask_path and req.side_mov_mask_path:
+    has_masks_b64 = bool(
+        req.front_ref_mask_b64 and req.front_mov_mask_b64 and req.side_ref_mask_b64 and req.side_mov_mask_b64
+    )
+    has_masks_path = bool(
+        req.front_ref_mask_path and req.front_mov_mask_path and req.side_ref_mask_path and req.side_mov_mask_path
+    )
+    if has_masks_b64:
+        front_ref = _decode_mask_b64(req.front_ref_mask_b64, front_gray.shape)
+        front_mov = _decode_mask_b64(req.front_mov_mask_b64, front_gray.shape)
+        side_ref = _decode_mask_b64(req.side_ref_mask_b64, side_gray.shape)
+        side_mov = _decode_mask_b64(req.side_mov_mask_b64, side_gray.shape)
+    elif has_masks_path:
         front_ref = _load_mask(req.front_ref_mask_path, front_gray.shape)
         front_mov = _load_mask(req.front_mov_mask_path, front_gray.shape)
         side_ref = _load_mask(req.side_ref_mask_path, side_gray.shape)
@@ -308,12 +355,10 @@ def plan_3d(req: Plan3DRequest) -> dict:
     from .planner_3d import plan_3d_astar, subdivide_to_daily
     from .collision import PoseTR
 
-    # 聚合所有 STL 路径（兼容旧的 stl_path）
-    paths: List[str] = []
-    if req.stl_paths:
-        paths.extend(req.stl_paths)
+    # 聚合所有 STL（base64 优先，兼容旧的 stl_paths / stl_path）
+    paths, _tmp = _materialize_stls(req.stl_paths, req.stl_b64)
     if req.stl_path:
-        paths.append(req.stl_path)
+        paths.append(_decode_path_if_garbled(req.stl_path))
     paths = [p for p in paths if p]
 
     if not paths:
@@ -328,8 +373,7 @@ def plan_3d(req: Plan3DRequest) -> dict:
 
         # 逐个读取 STL，并在世界坐标系下合并为一个整体刚体，保持相对位置不变
         merged = None
-        for raw_path in paths:
-            p = _decode_path_if_garbled(raw_path)
+        for p in paths:
             if not os.path.isfile(p):
                 continue
             mesh = pv.read(p)
@@ -379,6 +423,8 @@ def plan_3d(req: Plan3DRequest) -> dict:
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        _cleanup_tmp(_tmp)
 
 
 @app.post("/plan/3d/validate-collision")
@@ -545,6 +591,7 @@ class RatioBallRequest(BaseModel):
 class StlTo2DRequest(BaseModel):
     case_id: Optional[str] = None
     stl_paths: Optional[List[str]] = None
+    stl_b64: Optional[List[str]] = None  # 分机部署时传 STL 文件内容（base64）
 
 
 @app.post("/ratio-ball")
@@ -564,13 +611,17 @@ def ratio_ball(req: RatioBallRequest) -> dict:
 
 @app.post("/stl-to-2d")
 def stl_to_2d(req: StlTo2DRequest) -> dict:
-    """STL 三维转二维：正位图、侧位图 base64。"""
+    """STL 三维转二维：正位图、侧位图 base64。分机部署时用 stl_b64 传文件内容。"""
     from .stl_to_2d import stl_to_2d as _stl_to_2d
-    stl_paths = req.stl_paths or []
-    if not stl_paths and req.case_id:
-        # 若只传 case_id，由调用方（Nest）解析 case 下 STL 路径后传 stl_paths；此处不支持直接查库
-        raise HTTPException(status_code=400, detail="Provide stl_paths or ensure API layer passes resolved paths")
+    stl_paths, _tmp = _materialize_stls(req.stl_paths, req.stl_b64)
+    if not stl_paths:
+        raise HTTPException(
+            status_code=400,
+            detail="未提供 STL：请传 stl_b64（文件内容）或 stl_paths（同机路径）",
+        )
     try:
         return _stl_to_2d(stl_paths=stl_paths, front_view=True, side_view=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        _cleanup_tmp(_tmp)
