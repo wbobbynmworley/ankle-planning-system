@@ -38,8 +38,8 @@ venv/
 *.egg-info/
 .eggs/
 
-# Storage (uploaded files)
-storage/
+# Storage (uploaded files) — 仅忽略运行时上传目录，勿误伤 apps/api/src/storage 源码
+/storage/
 apps/api/storage/
 
 # Prisma
