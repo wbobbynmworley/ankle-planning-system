@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "prisma generate --schema=../../prisma/schema.prisma && nest build",
+    "build": "nest build",
+    "build:local": "prisma generate --schema=../../prisma/schema.prisma && nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
