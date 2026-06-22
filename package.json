@@ -5,6 +5,7 @@
     "seed": "cd apps/api && node prisma-seed.js"
   },
   "scripts": {
+    "postinstall": "prisma generate --schema=prisma/schema.prisma",
     "dev:api": "cd apps/api && npm run start:dev",
     "dev:web": "cd apps/web && npm run dev",
     "build:api": "cd apps/api && npm run build",
