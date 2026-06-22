@@ -22,8 +22,8 @@ export class HealthController {
     return {
       status: db ? 'ok' : 'degraded',
       db,
-      // 诊断用：存储后端（r2=持久 / disk=临时，重启会丢上传文件）、算法服务是否已配置
-      storage: this.storage.usingR2 ? 'r2' : 'disk',
+      // 诊断用：存储后端（s3=持久对象存储 / disk=临时，重启会丢上传文件）、算法服务是否已配置
+      storage: this.storage.usingObjectStore ? 's3' : 'disk',
       algoConfigured: !!process.env.ALGO_SERVICE_URL,
       time: new Date().toISOString(),
     };

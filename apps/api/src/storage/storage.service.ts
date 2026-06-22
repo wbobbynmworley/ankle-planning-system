@@ -10,12 +10,16 @@ import {
 } from '@aws-sdk/client-s3';
 
 /**
- * 统一文件存储层：
- * - 配置了 R2_* 环境变量时走 Cloudflare R2（S3 兼容，对象存储，重启不丢）；
+ * 统一文件存储层（任意 S3 兼容对象存储：Supabase / Backblaze B2 / Tencent COS / MinIO / R2 …）：
+ * - 配置了 S3_*（或兼容的 R2_*）环境变量时走对象存储，重启不丢；
  * - 否则回退到本地磁盘 FILE_STORAGE_PATH（本地开发 / 同机部署）。
  *
  * `key` 统一用正斜杠的相对路径（如 `cases/<caseId>/STL/123-foo.stl`），
- * 既是 R2 的对象键，也是磁盘相对路径；`File.path` 保存的就是这个 key。
+ * 既是对象键，也是磁盘相对路径；`File.path` 保存的就是这个 key。
+ *
+ * 通用变量：S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET,
+ *           S3_FORCE_PATH_STYLE（Supabase/B2/MinIO 需 true）。
+ * R2 便捷变量：R2_ACCOUNT_ID（自动拼 endpoint）+ R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_BUCKET。
  */
 @Injectable()
 export class StorageService {
@@ -26,23 +30,32 @@ export class StorageService {
 
   constructor() {
     this.diskRoot = process.env.FILE_STORAGE_PATH ?? path.join(process.cwd(), 'storage');
-    const accountId = process.env.R2_ACCOUNT_ID;
-    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-    this.bucket = process.env.R2_BUCKET ?? '';
-    if (accountId && accessKeyId && secretAccessKey && this.bucket) {
+    const r2Account = process.env.R2_ACCOUNT_ID;
+    const endpoint =
+      process.env.S3_ENDPOINT ||
+      (r2Account ? `https://${r2Account}.r2.cloudflarestorage.com` : '');
+    const accessKeyId = process.env.S3_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY;
+    this.bucket = process.env.S3_BUCKET || process.env.R2_BUCKET || '';
+    const region = process.env.S3_REGION || 'auto';
+    // R2 用 virtual-hosted 风格；其它 S3 兼容（Supabase/B2/MinIO）通常需 path-style
+    const forcePathStyle = process.env.S3_FORCE_PATH_STYLE
+      ? process.env.S3_FORCE_PATH_STYLE === 'true'
+      : !r2Account;
+    if (endpoint && accessKeyId && secretAccessKey && this.bucket) {
       this.s3 = new S3Client({
-        region: 'auto',
-        endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+        region,
+        endpoint,
         credentials: { accessKeyId, secretAccessKey },
+        forcePathStyle,
       });
-      this.logger.log(`Storage: Cloudflare R2 enabled (bucket=${this.bucket})`);
+      this.logger.log(`Storage: S3-compatible enabled (endpoint=${endpoint}, bucket=${this.bucket}, pathStyle=${forcePathStyle})`);
     } else {
-      this.logger.log(`Storage: local disk at ${this.diskRoot} (R2 not configured)`);
+      this.logger.log(`Storage: local disk at ${this.diskRoot} (object storage not configured)`);
     }
   }
 
-  get usingR2(): boolean {
+  get usingObjectStore(): boolean {
     return this.s3 !== null;
   }
 
