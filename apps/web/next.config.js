@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  // standalone 仅用于 Docker 自托管；Vercel 有自己的输出处理，不需要此模式
+  ...(process.env.VERCEL ? {} : { output: 'standalone' }),
   // API (NestJS) 的 TS 文件不属于 Next.js 构建范围；忽略其错误以防 Vercel 构建中断。
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
