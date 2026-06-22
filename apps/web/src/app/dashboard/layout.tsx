@@ -26,7 +26,8 @@ const PRIMARY_NAV = [
   { href: '/dashboard/postop', label: '术后规划', icon: MapPin },
   { href: '/dashboard/execution', label: '方案执行监督与调整', icon: CalendarCheck },
   { href: '/dashboard/cases', label: '病例管理', icon: FolderOpen },
-  { href: '/dashboard/perms', label: '权限管理', icon: Shield },
+  // 权限管理仅管理员可用（后端 /perms 为 ADMIN-only），医生不显示，避免 403
+  { href: '/dashboard/perms', label: '权限管理', icon: Shield, adminOnly: true },
   { href: '/dashboard/instruments', label: '器械管理', icon: Package },
 ];
 
@@ -73,7 +74,9 @@ export default function DashboardLayout({
   }
 
   const roleLabel = user?.role === 'ADMIN' ? '管理员' : user?.role === 'DOCTOR' ? '医生' : '患者';
-  const NAV = user?.role === 'PATIENT' ? PATIENT_NAV : PRIMARY_NAV;
+  const NAV = (user?.role === 'PATIENT' ? PATIENT_NAV : PRIMARY_NAV).filter(
+    (item) => !('adminOnly' in item && item.adminOnly) || user?.role === 'ADMIN',
+  );
 
   return (
     <div className="flex min-h-screen bg-[var(--background)]">

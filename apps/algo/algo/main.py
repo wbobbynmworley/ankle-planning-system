@@ -112,6 +112,26 @@ def _cleanup_tmp(paths: List[str]) -> None:
             pass
 
 
+def _simplify_mesh(mesh):
+    """三角面过多时抽取简化：CT 导出的 STL 常有数十万~百万面，免费 CPU 上会因体素化/
+    碰撞检测内存暴涨而崩溃（worker 被 OOM 杀掉 → 平台返回 500）。降到 ALGO_MAX_TRIANGLES
+    （默认 4 万）面，几何形状基本保留，内存与耗时大幅下降。"""
+    try:
+        max_cells = int(os.environ.get("ALGO_MAX_TRIANGLES", "40000"))
+        n = getattr(mesh, "n_cells", 0) or 0
+        if max_cells > 0 and n > max_cells:
+            reduction = min(max(1.0 - max_cells / float(n), 0.0), 0.95)
+            simplified = mesh.decimate(reduction)
+            if simplified is not None and getattr(simplified, "n_points", 0) > 0:
+                if hasattr(simplified, "triangulate"):
+                    simplified = simplified.triangulate()
+                return simplified
+    except Exception:
+        # 简化失败则退回原网格，保证功能不中断
+        pass
+    return mesh
+
+
 def _decode_path_if_garbled(path: str) -> str:
     """若路径含中文被误解码为 GBK，尝试还原为 UTF-8 路径（Windows 下 API 传过来的路径可能乱码）"""
     if not path or os.path.isfile(path):
@@ -394,6 +414,7 @@ def plan_3d(req: Plan3DRequest) -> dict:
                 "rawPath": [],
             }
 
+        merged = _simplify_mesh(merged)
         moving_vtk = merged if hasattr(merged, "GetBounds") else merged.GetVTK()
 
         # 起点/终点平移（mm），默认与旧逻辑一致：start=[0,0,0], goal=[5,0,0]
@@ -459,6 +480,7 @@ def validate_3d_collision(req: Validate3DCollisionRequest) -> dict:
                     mesh = mesh.extract_surface()
             if hasattr(mesh, "triangulate"):
                 mesh = mesh.triangulate()
+            mesh = _simplify_mesh(mesh)
             vtk_poly = mesh if hasattr(mesh, "GetBounds") else mesh.GetVTK()
             polys.append(vtk_poly)
             t = pose_dict.get("t") or [0, 0, 0]
@@ -528,6 +550,7 @@ def plan_3d_multi(req: Plan3DMultiRequest) -> dict:
                     mesh = mesh.extract_surface()
             if hasattr(mesh, "triangulate"):
                 mesh = mesh.triangulate()
+            mesh = _simplify_mesh(mesh)
             vtk_poly = mesh if hasattr(mesh, "GetBounds") else mesh.GetVTK()
             polys.append(vtk_poly)
             # pyvista DataSet.center is a property (x,y,z)
